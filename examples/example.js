@@ -1,155 +1,118 @@
-const {init,Task,runTask } = require('./index')
-const fs = require('fs');
-const ndjson = require('ndjson')
-const FILE = './db.json';
-process.on('unhandledRejection', err => {
-  // Will print "unhandledRejection err is not defined"
-  console.log('unhandled Promise Rejection');
-  console.log(err);
-
-});
+const { Task,TaskManager } = require('../index');
+const ProjectTask = require('./ProjectTask');
 function wait(time=200){
-	return new Promise(r=>setTimeout(r,time))
+	return new Promise(r=>setTimeout(r,time*2))
 }
-function dbSave(payload){
-	payload = JSON.stringify(payload);
-	return new Promise(function(resolve,reject) {
-		fs.appendFile(FILE, payload+'\n', function (err) {
-		  return err ? reject(err) : resolve()
-		});
-	});
-}
-function dbFind({task_id,event_type,logged_at}) {
-	let stream = fs.createReadStream(FILE, {encoding: 'utf8'});
-	let values = [];
-	stream = stream.pipe(ndjson.parse())
-	return new Promise(function(resolve,reject) {
-		stream.on('error',function(e){
-			console.log(e)
-		}).on('data', function(obj) {
-			obj.logged_at = new Date(obj.logged_at);
-			if(obj.task_id !== task_id){
-				return
-			}
-			if(obj.event_type !== event_type){
-				return
-			}
-			if(obj.logged_at < logged_at){
-				return
-			}
-			obj.refTime = logged_at;
-			values.push(obj)
-		}).on('finish',function(argument) {
-			return resolve(values)
-		})
-	});
-}
-class Example extends Task {
+class RouteExample extends ProjectTask {
 	constructor(options){
 		super(options)
-		this.logName = 'Example';
+		this.name = 'RouteExample';
 	}
 	* requires(){
 		yield EChild3
-		yield EChild2
+		yield ExtendedCutOff
 		yield EChild4
 	}
-	async isComplete(){
-		let values = await this._checkIsRequired()
-		return !values.length
-	}
 	async run(){
-		
+		await wait(3500)
 		return 
 	}
 }	
 
-class EChild extends Task {
+class EChild extends ProjectTask {
 	constructor(options){
 		super(options);
-		this.logName = 'EChild'
-	}
-	async isComplete(){
-		let values = await this._dbFind({
-    		task_id:this.logName,
-    		event_type:'started',
-    		logged_at:new Date("2019-01-06T18:14:20.479Z")
-    	})
-		return !values.length
+		this.name = 'EChild'
 	}
 	async run(){
-		
+		await wait(2500)
 	}
 }
-class EChild2 extends Task {
+class LeafChild extends ProjectTask {
 	constructor(options){
 		super(options);
-		this.logName = 'EChild2'
+		this.name = 'LeafChild';
+	}
+	async run(){
+		await wait(5000)
+	}
+}
+class ExtendedCutOff extends ProjectTask {
+	constructor(options){
+		super(options);
+		this.name = 'ExtendedCutOff';
+		this.cutOffTime = 1000*60*60;
 	}
 	requires(){
 		return [
-			EChild
+			EChild,
+			LeafChild
 		]
 	}
-	async isComplete(){
-		let values = await this._dbFind({
-    		task_id:this.logName,
-    		event_type:'started',
-    		logged_at:this.runTime // new Date("2019-01-06T18:14:20.479Z")
-    	})
-		return !values.length
-	}
 	async run(){
-		
+		await wait(1600)
 	}
 }
-class EChild4 extends Task {
+class EChild4 extends ProjectTask {
 	constructor(options){
 		super(options);
-		this.logName = 'EChild4'
+		this.name = 'EChild4'
 	}
 	requires(){
 		return [
-			EChild2,
 			EChild3
 		]
 	}
 	async isComplete(){
-		let values = await this._checkIsRequired({newerThan:'2018-01-01'})
-		return !values.length
+		let lastRun = await this.checkLastRun();
+		this.lastRun = lastRun || {event:'completed'};
+		return lastRun && lastRun.event == 'completed'
+	}
+	async poleCompletion(){
+		let maxPoles = 100;
+		let i = 0;
+		while(this.lastRun.event !== 'completed'){
+			let lastRun = await this.checkLastRun();
+			this.lastRun = lastRun || {event:'completed'}
+			console.log('POLE ',i,this.lastRun);
+			await wait(1000);
+			i++;
+			if(i >= maxPoles){
+				throw new Error('TOO MANY POLES')
+			}
+		}
+		return
 	}
 	async run(){
-		await wait(500)
+		if(this.lastRun.event !== 'completed'){
+			return this.poleCompletion();
+		}
+		await wait(5000)
+
 	}
 }
-class EChild3 extends Task {
+class EChild3 extends ProjectTask {
 	constructor(options){
 		super(options);
-		this.logName = 'EChild3'
+		this.name = 'EChild3'
 	}
 	* requires(){
 		yield EChild
 	}
-	async isComplete(){
-		let values = await this._dbFind({
-    		task_id:this.logName,
-    		event_type:'started',
-    		logged_at:this.runTime // new Date("2019-01-06T18:14:20.479Z")
-    	})
-		return !values.length
-	}
 	async run(){
-		
+		await wait(1500)
 	}
 }
 async function start(){
-	init({dbFind,dbSave})
-	let res = await runTask(Example)
+	let tm = new TaskManager({});
+	let res = await tm.runTask(RouteExample,{});
 	console.log(res);
 }
-start()
-
-
+module.exports = {
+	TaskManager,
+	RouteExample,
+	makeTask:e=>new TaskManager({})
+}
 
 
 

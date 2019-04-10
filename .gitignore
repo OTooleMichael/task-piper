@@ -54,7 +54,7 @@ private/*
 *.DS_Store
 redshiftSQL.zip
 numbers.json
-
+*db.json
 
 # visual studio code shortcuts
 .vscode/launch.json 

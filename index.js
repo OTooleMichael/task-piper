@@ -1,23 +1,22 @@
-const Task = require('./Task');
+const Task = require('./lib/Task');
+const TaskManager = require('./lib/TaskManager');
 
-function init({dbSave,dbFind}){
-	if(!dbSave || !dbFind){
-		throw new Error('dbSave and dbFind are required')
+function validateTaskInst(inst){
+	if(!(inst instanceof Task)){
+		throw new Error('Is Not an instanceof Task Class');
 	}
-	Task.prototype._dbSave = dbSave;
-	Task.prototype._dbFind = dbFind;
-	return
-}
+	if(!inst.logName){
+		throw new Error('this.logName must be defined for All Task Instances');
+	}
+	let requiredMethods = ['isComplete','log']
+	for(let m of requiredMethods){
+		if(typeof inst[m] !== 'function'){
+			throw new Error(m+' is a required Method of '+inst.logName)
+		}
+	}
+};
 
-function runTask(TaskClass,options={}) {
-	let instance = new TaskClass(options);
-	Task.validateTaskInst(instance);
-	console.log('RUNNING TASK :',instance.logName)
-	console.log('RUN TIME is ',instance.runTime)
-	return instance._runAsTopLevel()
-}
 module.exports = {
-	init,
-	Task,
-	runTask
+	TaskManager,
+	Task
 }

@@ -1,0 +1,193 @@
+<html>
+<body>
+<style>
+   .net {
+    width: 600px;
+    height: 300px;
+    border: 1px solid lightgray;
+   }
+</style>
+<div>
+  	<button id='show'>Show Hide</button>
+	<div class="net" id="network0"></div>
+	<div  class="net" id="network1"></div>
+</div>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+<script>
+var bnt = document.getElementById('show');
+let show = true;
+bnt.onclick = function(){
+  show = !show;
+  let nodes = data.nodes.filter(function(n){
+  	// let ok = /NO_RUN/i.test(n.label)
+   //  return (show || !ok)
+  });
+  render({
+    nodes,
+    edges:data.edges
+  })
+}
+var options = { 
+  manipulation: false,
+  height: '100%',
+  layout:{},
+  interaction: {
+    dragNodes: false
+  },
+  physics: {
+  	enabled:false
+  },
+  nodes: {
+    shape: 'box',
+    font: {'face': 'monospace', 'align': 'left'},
+    color: {
+      background: "red",
+      highlight: "#7c8adc"
+    }
+  },
+  edges: {
+    arrows: {
+      to: {
+        enabled: true
+      }
+    },
+    smooth: {
+      type: 'cubicBezier'
+    }
+  }
+};
+
+function createChart(chartId,data){
+	var container = document.getElementById(chartId);
+	let params  = Object.assign({},options);
+	if(chartId == 'network0'){
+		 params.layout = {
+		    hierarchical: {
+		      direction: "RL",
+		      enabled: true,
+		      levelSeparation: 250
+		    }
+		  }
+	}else{
+		params.layout = {
+			hierarchical: {
+		      enabled:true,
+		      levelSeparation: 150,
+		      nodeSpacing: 150,
+		      treeSpacing: 100,
+		      blockShifting: true,
+		      edgeMinimization: true,
+		      parentCentralization: true,
+		      direction: 'LR',        // UD, DU, LR, RL
+		      sortMethod: 'directed'   // hubsize, directed
+		    }
+		}
+	}
+	let chart = new vis.Network(container, data, params);
+	return {
+		chart,
+		container
+	}
+}
+function visData(data){
+	const { edges,nodes,id } = data;
+	return {
+		id,
+		edges:new vis.DataSet(edges),
+		nodes:new vis.DataSet(nodes),
+		rawNodes:nodes
+	};
+}
+function Chart(chartId,data){
+	this.chartId = chartId;
+	this.rawData = data;
+	this.data = visData(data);
+	let {chart,container} = createChart(chartId,this.data);
+	this.container = container
+	this.network = chart;
+	this.network.on("click",(params)=>{
+	  	let node = this.data.rawNodes.find(n=>n.id==params.nodes[0]);
+	  	params.node = node;
+	  	console.log(params);
+	})
+	charts[chartId] = this;
+	this.setData = function(data) {
+		const { nodes, id } = data;
+		if( this.data.id !== id ){
+			this.data = visData(data)
+			this.network.setData(this.data);
+			//data.edges.update(edges)
+		}else{
+			this.data.nodes.update(nodes)
+		}
+	}
+	return this
+}
+let charts = {};
+new Chart('network0',{edges:[],nodes:[]});
+new Chart('network1',{edges:[],nodes:[]});
+
+function tierNodes(list){
+	let edges = [];
+	let d = {};
+	let pvt = {};
+	list.forEach(function(node) {
+		let {tier,id} = node;
+		t = tier.toString();
+		let n = (tier + 1).toString()
+		if(!d[t]){
+			d[t] = []
+		}
+		node.tierRun = node.tier+'b'
+		d[t].push(node);
+		pvt[t] = pvt[t] ? pvt[t]:  {
+			id:t,
+			label:'TIER '+t,
+			color:'yellow',
+			tierRun:t+'a'
+		}
+		pvt[n] = pvt[n] ? pvt[n] : {
+			id:n,
+			label:'TIER '+n,
+			color:'yellow',
+			tierRun:n+'a'
+		};
+		edges = edges.concat([
+			{to:id, from:t, o:t},
+			{to:n, from:id, o:n }
+		]);
+	});
+	let nodes = [];
+	for(let k in d){
+		nodes = nodes.concat(d[k])
+	}
+	for(let k in pvt){
+		nodes.push(pvt[k]);
+	}
+	nodes.sort((a,b)=>a.tierRun+a.id > b.tierRun+b.id ? 1 : -1);
+	edges.sort((a,b)=>a.o > b.o ? 1 : -1)
+	return {
+		nodes,
+		edges
+	}
+}
+
+function getData(){
+	axios.get('/data').then(res=>{
+		let { edges,nodes,id } = res.data;
+		window.d = res.data;
+		nodes.sort((a,b)=>a.depth+a.id > b.depth+b.id ? 1 : -1);
+		charts.network0.setData(res.data)
+		let rev = tierNodes(nodes);
+		rev.id = id;
+		charts.network1.setData(rev)
+	})
+}
+setInterval(function () {
+	getData()
+},1500);
+
+</script>
+</body>
+</html>
