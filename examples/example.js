@@ -1,7 +1,7 @@
 const { Task,TaskManager } = require('../index');
 const ProjectTask = require('./ProjectTask');
 function wait(time=200){
-	return new Promise(r=>setTimeout(r,time*2))
+	return new Promise(r=>setTimeout(r,time))
 }
 class RouteExample extends ProjectTask {
 	constructor(options){
@@ -91,21 +91,19 @@ class EChild4 extends ProjectTask {
 
 	}
 }
-class EChild3 extends ProjectTask {
-	constructor(options){
-		super(options);
-		this.name = 'EChild3'
+const EChild3 = ProjectTask.createTask({
+	name:'EChild3',
+	requires:function requires(){
+		return [ EChild ]
+	},
+	run:async function run(task){
+		console.log(task.name,task.runTime);
+		await wait(1500);
 	}
-	* requires(){
-		yield EChild
-	}
-	async run(){
-		await wait(1500)
-	}
-}
+});
+
 async function start(){
-	let tm = new TaskManager({});
-	let res = await tm.runTask(RouteExample,{});
+	let res = await EChild3.run({});
 	console.log(res);
 }
 module.exports = {
