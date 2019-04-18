@@ -9,7 +9,7 @@ function serveFile(response){
 		response.end(str);
 	})
 }
-const requestHandler = (request, response) => {
+const requestHandler = async (request, response) => {
   const {url,method} = request;
   if(!tm){
 	start();
@@ -17,6 +17,7 @@ const requestHandler = (request, response) => {
   if(method === 'GET' && url == '/'){
   	return serveFile(response)
   }
+  let parts = url.split('/').filter(v=>v);
   if(url == '/data'){
   	try{
 	  	let data = getData(tm.routeNode)

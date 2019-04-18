@@ -8,25 +8,20 @@
    }
 </style>
 <div>
-  	<button id='show'>Show Hide</button>
+	<div>	
+		<input id='task-name' type="text" />
+  		<button id='get-tree'>Get Tree</button>
+  	</div>
 	<div class="net" id="network0"></div>
 	<div  class="net" id="network1"></div>
 </div>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
 <script>
-var bnt = document.getElementById('show');
+var bnt = document.getElementById('get-tree');
 let show = true;
 bnt.onclick = function(){
-  show = !show;
-  let nodes = data.nodes.filter(function(n){
-  	// let ok = /NO_RUN/i.test(n.label)
-   //  return (show || !ok)
-  });
-  render({
-    nodes,
-    edges:data.edges
-  })
+	
 }
 var options = { 
   manipulation: false,
