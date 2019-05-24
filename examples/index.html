@@ -11,6 +11,7 @@
 	<div>	
 		<input id='task-name' type="text" />
   		<button id='get-tree'>Get Tree</button>
+  		<button onclick="start()">Start</button>
   	</div>
 	<div class="net" id="network0"></div>
 	<div  class="net" id="network1"></div>
@@ -167,7 +168,11 @@ function tierNodes(list){
 		edges
 	}
 }
-
+function start(){
+	setInterval(function () {
+		getData()
+	},1500);
+}
 function getData(){
 	axios.get('/data').then(res=>{
 		let { edges,nodes,id } = res.data;
@@ -179,9 +184,7 @@ function getData(){
 		charts.network1.setData(rev)
 	})
 }
-setInterval(function () {
-	getData()
-},1500);
+
 
 </script>
 </body>

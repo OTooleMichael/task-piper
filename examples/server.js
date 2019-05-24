@@ -32,9 +32,12 @@ const requestHandler = async (request, response) => {
 async function start(){
 	try{
 		tm = makeTask();
+		tm.on('progress',function(task){
+			console.log(task.runId,task.name,task.result)
+		})
 		let res = await tm.runTask(RouteExample,{});
 	}catch(error){
-		console.log(error);
+		console.log(error,'ERROR OUT');
 		tm = null
 	}
 }

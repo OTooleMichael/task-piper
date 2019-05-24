@@ -51,6 +51,7 @@ class ExtendedCutOff extends ProjectTask {
 	}
 	async run(){
 		await wait(1600)
+		throw new Error('TEST')
 	}
 }
 class EChild4 extends ProjectTask {
