@@ -58,4 +58,4 @@ numbers.json
 
 # visual studio code shortcuts
 .vscode/launch.json 
-
+.eslintcache
