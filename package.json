@@ -1,16 +1,43 @@
 {
   "name": "task-piper",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev":"node examples/server",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node dist/examples/server",
+    "start:dev": "nodemon",
+    "lint": "eslint lib/ --ext .jsx,.js,.ts",
+    "lint:fix": "eslint lib/ --ext .jsx,.js,.ts --fix",
+    "lint:cached": "eslint  --ext .jsx,.js,.ts lib/ --cache",
+    "linter": "node node_modules/watch/cli.js \"npm run lint:cached\" --wait=10",
+    "test": "jest --watchAll",
+    "build":"rm dist/ -r; npx tsc --rootDir lib --outDir dist"
   },
-  "author": "",
+  "author": "Michael O Toole",
   "license": "ISC",
+  "nodemon": {
+    "watch": [
+      "src"
+    ],
+    "ext": ".ts,.js",
+    "ignore": [],
+    "exec": "ts-node ./dist/examples/server.js"
+  },
   "dependencies": {
-    "ndjson": "^1.5.0",
     "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^25.1.4",
+    "@types/node": "^13.9.1",
+    "@types/uuid": "^7.0.0",
+    "@typescript-eslint/eslint-plugin": "^2.23.0",
+    "@typescript-eslint/parser": "^2.23.0",
+    "eslint": "^6.8.0",
+    "jest": "^25.1.0",
+    "ndjson": "^1.5.0",
+    "ts-jest": "^25.2.1",
+    "ts-node": "^8.6.2",
+    "typescript": "^3.8.3",
+    "watch": "^1.0.2"
   }
 }
