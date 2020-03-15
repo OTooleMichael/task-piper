@@ -1,6 +1,6 @@
 {
   "name": "task-piper",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "lint:cached": "eslint  --ext .jsx,.js,.ts lib/ --cache",
     "linter": "node node_modules/watch/cli.js \"npm run lint:cached\" --wait=10",
     "test": "jest --watchAll",
-    "build":"rm dist/ -r; npx tsc --rootDir lib --outDir dist"
+    "build": "rm dist/ -r; npx tsc --rootDir lib --outDir dist"
   },
   "author": "Michael O Toole",
   "license": "ISC",
