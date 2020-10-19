@@ -1,12 +1,8 @@
-import { TaskManager, Task } from '../index'
+import { Task, Registry } from '../index'
 import ProjectTask from './ProjectTask'
-import { 
-	TaskOptions, TaskBase
-} from '../types'
 
-export interface TaskConstructor {
-    new (opts?: TaskOptions, parentInst?: TaskBase): Task;
-}
+
+export type TaskConstructor = typeof Task
 
 function wait(time=200): Promise<void>{
 	return new Promise(r=>setTimeout(r,time))
@@ -42,8 +38,7 @@ const EChild3Data = {
 	requires:function requires(): TaskConstructor[]{
 		return [ EChild ]
 	},
-	run:async function run(task): Promise<void>{
-		console.log(task.name,task.runTime);
+	async run(): Promise<void>{
 		await wait(1500);
 	}
 }
@@ -66,7 +61,6 @@ class EChild4 extends ProjectTask {
 		while(this.lastRun && this.lastRun.event !== 'completed'){
 			const lastRun = await this.checkLastRun();
 			this.lastRun = lastRun || {event:'completed'}
-			console.log('POLE ',i,this.lastRun);
 			await wait(1000);
 			i++;
 			if(i >= maxPoles){
@@ -88,7 +82,7 @@ class EChild4 extends ProjectTask {
 	}
 }
 
-class RouteExample extends Task {
+class RouteExample extends ProjectTask {
 	name = 'RouteExample';
 	*requires(): Generator<TaskConstructor>{
 		yield EChild3
@@ -104,11 +98,26 @@ class RouteExample extends Task {
 // 	const res = await EChild3.run({});
 // 	console.log(res);
 // }
-const makeTask = function(): TaskManager{
-	return new TaskManager({});
+class MyRegistry extends Registry{
+	add(TaskClass: typeof ProjectTask): this{
+		TaskClass.registry = this
+		super.add(TaskClass)
+		return this
+	}
 }
-
-export { TaskManager, RouteExample, makeTask }
+const registry = new MyRegistry()
+const tasks: TaskConstructor[] = [
+	RouteExample,
+	EChild,
+	EChild3,
+	EChild4,
+	LeafChild,
+	ExtendedCutOff
+]
+tasks.forEach(function(task){
+	registry.create(task)
+})
+export default registry
 
 
 

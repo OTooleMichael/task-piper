@@ -1,7 +1,4 @@
-export interface TaskConstructor {
-    new (opts?: TaskOptions): TaskBase;
-}
-export type RequireReturn = TaskConstructor;
+
 export interface RunResult {
 	depth: number;
 	result?: ResultState;
@@ -33,6 +30,7 @@ export interface MinTask {
 	depth: number;
 	name?: string;
 }
+
 export interface TaskBase extends MinTask {
 	runId: string;
 	runTime: Date;
@@ -45,8 +43,7 @@ export interface TaskBase extends MinTask {
 	tier?: number;
 	results?: any;
 	error?: Error;
-	_requiredTasks?: RequireReturn[];
-	isComplete: () => boolean | Promise<boolean>;
+	[x: string]: any;
 }
 
 

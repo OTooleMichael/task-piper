@@ -12,13 +12,12 @@ interface FindParams {
 	limit?: number;
 	match(d: LogEvent): boolean;
 }
+function clear(): Promise<void>{
+	return fs.promises.writeFile(FILE,'')
+}
 function write(payload: LogEvent): Promise<void>{
 	const logLine = JSON.stringify(payload);
-	return new Promise(function(resolve,reject) {
-		fs.appendFile(FILE, logLine+'\n', function (err) {
-			return err ? reject(err) : resolve()
-		});
-	});
+	return fs.promises.appendFile(FILE, logLine+'\n');
 }
 function find(params: FindParams): Promise<LogEvent[]>{
 	const {match, limit} = params
@@ -42,5 +41,5 @@ function find(params: FindParams): Promise<LogEvent[]>{
 	});
 }
 export default {
-	find, write
+	find, write, clear
 }

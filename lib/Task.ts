@@ -1,7 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import { 
-	TaskOptions, TaskBase, 
-	RequireReturn, ResultState, 
+	TaskOptions, TaskBase, ResultState, 
 	LogableEvent, RunResult 
 } from './types'
 async function iterate<T>(it: IterableIterator<T>): Promise<T[]>{
@@ -13,9 +12,18 @@ async function iterate<T>(it: IterableIterator<T>): Promise<T[]>{
 	}
 	return out
 }
+class NotImplementedError extends Error {
+	constructor(method: string, taskName: string){
+		super(`Method .${method} Not Implemented: ${taskName}`)
+	}
+}
+const wait = (t: number): Promise<void> => new Promise(resolve=>setTimeout(resolve,t))
+
+
+
 export default class Task implements TaskBase {
 	node?: any; // its a Node
-	name?: string;
+	name = 'NOT_IMPLEMENTED';
 	options: any;
 	runId: string;
 	runTime: Date;
@@ -28,13 +36,15 @@ export default class Task implements TaskBase {
 	tier?: number;
 	results?: any;
 	error?: Error;
-	_requiredTasks?: RequireReturn[];
+	_requiredTasks?: (typeof Task)[];
+	_awaitedRun?: Promise<RunResult>;
+	timeoutMillis = 0;
 	constructor(options?: TaskOptions) {
 		if(!options){
 			options = { depth:0 };
 		}
 		this.runId = uuid();
-		this.options = Object.assign({},options);
+		this.options = {...options}
 		this.options.runTime = this.options.runTime || new Date();
 		this.runTime = this.options.runTime;
 		this.depth = options.depth ||  0
@@ -44,23 +54,23 @@ export default class Task implements TaskBase {
 	}
 	//eslint-disable-next-line
 	log(data: LogableEvent): void { 
-		throw new Error('.log Not Implemented')
+		// should be implmented if loggging is desired
 	}
 	isComplete(): boolean | Promise<boolean> {
-		throw new Error('.isComplete Not Implemented')
+		throw new NotImplementedError('isComplete', this.name)
 	}
 	//eslint-disable-next-line
 	run(task?: Task): any {
-		throw new Error('.run Not Implemented')
+		throw new NotImplementedError('run', this.name)
 	}
 	preRunCheck(): boolean | Promise<boolean> {
 		return true
 	}
 	requires(): IterableIterator<any> | any[] {
-		return ([] as RequireReturn[])
+		return ([] as TaskConstructor[])
 	}
-	resolveRequirement(value: any): RequireReturn {
-		return value as RequireReturn
+	resolveRequirement(value: any): TaskConstructor {
+		return value as TaskConstructor
 	}
 	_markAsStarted(): void{
 		this._startedAt = new Date();
@@ -68,7 +78,7 @@ export default class Task implements TaskBase {
 	}
 	_markAsComplete(): void {
 		if(!this._startedAt){
-			throw new Error('._startedAt not defined')
+			throw new Error('._startedAt is not set: ' + this.name)
 		}
 		this._isCompletedAt = new Date();
 		this.ranFor = this._isCompletedAt.valueOf() - this._startedAt.valueOf()
@@ -87,7 +97,7 @@ export default class Task implements TaskBase {
 		this.isCompleted = await this.isComplete()
 		return this.isCompleted
 	}
-	async _requires(): Promise< RequireReturn[] >{
+	async _requires(): Promise<TaskConstructor[] >{
 		try{
 			const requires = await Task.normaliseIterator(this.requires())
 			return requires.map(value=>{
@@ -104,6 +114,12 @@ export default class Task implements TaskBase {
 		}
 		return false;
 	}
+	awaitRun(): Promise<RunResult>{
+		if(!this._awaitedRun){
+			this._awaitedRun = this._run()
+		}
+		return this._awaitedRun
+	}
 	async _run(): Promise<RunResult>{
 		const out: RunResult = {
 			result:this.result,
@@ -118,7 +134,17 @@ export default class Task implements TaskBase {
 		try{
 			await this._preRunCheck();
 			await this._markAsStarted();
-			this.results = await this.run(this);
+			if(this.timeoutMillis){
+				this.results = await Promise.race([
+					this.run(this),
+					wait(this.timeoutMillis).then(()=>{
+						const e = new Error(`Timeout ${this.timeoutMillis}: ${this.name}`)
+						return Promise.reject(e)
+					})
+				]) 
+			}else{
+				this.results = await this.run(this)
+			}
 			await this._markAsComplete();
 			out.result = this.result = ResultState.RUN;
 			out.results = this.results;
@@ -127,7 +153,6 @@ export default class Task implements TaskBase {
 		}catch(error){
 			this.result = ResultState.ERROR;
 			this.error = error;
-			await this.log({event:'error'});
 			throw error;
 		}
 	}
@@ -140,21 +165,20 @@ export default class Task implements TaskBase {
 		}
 		return (toIterate as T[])
 	}
-	static createTask(params: { name: string }): any{
-		const { name } = params;
+	public static createTask(params: { name: string }): typeof Task{
+		const { name, ...restParams } = params;
 		if(!name) throw new Error('name is a required field');
 		const SuperMostTaskClass = this || Task;
 		class MixinTask extends SuperMostTaskClass{
+			name = name;
 			constructor(options){
 				super(options)
-				for(const k in params){
-					this[k] = params[k];
+				for(const k in restParams){
+					this[k] = restParams[k];
 				}
 			}
 		}
 		return MixinTask
 	}
 }
-type TaskClass = new () => Task;
-
-
+export type TaskConstructor = typeof Task;

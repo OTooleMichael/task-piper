@@ -6,13 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = __importDefault(require("fs"));
 const ndjson_1 = __importDefault(require("ndjson"));
 const FILE = './db.json';
+function clear() {
+    return fs_1.default.promises.writeFile(FILE, '');
+}
 function write(payload) {
     const logLine = JSON.stringify(payload);
-    return new Promise(function (resolve, reject) {
-        fs_1.default.appendFile(FILE, logLine + '\n', function (err) {
-            return err ? reject(err) : resolve();
-        });
-    });
+    return fs_1.default.promises.appendFile(FILE, logLine + '\n');
 }
 function find(params) {
     const { match, limit } = params;
@@ -36,5 +35,5 @@ function find(params) {
     });
 }
 exports.default = {
-    find, write
+    find, write, clear
 };

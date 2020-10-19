@@ -1,39 +1,25 @@
-import { Task } from '../index'
+import { Task  } from '../index'
 import db, {LogEvent} from './db'
-import { 
-	TaskOptions
-} from '../types'
 interface RunData {
 	event: string;
 }
-interface ProjectTaskData {
-	name: string;
-	run: (task?: ProjectTask) => any;
-}
-interface TaskConstructor {
-    new (opts?: TaskOptions): Task;
-}
+type TaskConstructor = typeof Task
 export default class ProjectTask extends Task {
 	lastRun?: RunData;
 	cutOffTime: number;
 	db: typeof db;
 	lastRuns?: RunData[];
-	registry?: any;
+	static registry?: any;
 	constructor(options){
 		super(options);
-		this.registry = options.registry
 		this.db = db;
 		this.cutOffTime = 1000*60*15
 	}
-	getTaskByName(name: string): any{
-		if(!this.registry){
-			throw 'registry missing'
+	resolveRequirement(value: TaskConstructor | string): TaskConstructor{
+		if(typeof value === 'string'){
+			return ProjectTask.registry.get(value)
 		}
-		return this.registry.get(name)
-	}
-	resolveRequirement(value: any): TaskConstructor{
-		console.log(value,'RESOLVE')
-		return value as TaskConstructor
+		return value
 	}
 	async checkLastRun(): Promise<LogEvent | undefined>{
 		const { cutOffTime, runTime, name} = this;
@@ -57,7 +43,6 @@ export default class ProjectTask extends Task {
 		if(!name || !runTime){
 			throw new Error('.name & .runTime is required');
 		}
-		console.log(event,name,new Date())
 		await db.write({
 			loggedAt:new Date(),
 			event,

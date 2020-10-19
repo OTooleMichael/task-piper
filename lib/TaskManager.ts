@@ -5,10 +5,8 @@ import {
 import Task from './Task'
 import Node from './Node'
 
+export type TaskConstructor = typeof Task;
 
-export interface TaskConstructor {
-    new (opts?: TaskOptions): Task;
-}
 function validateTaskInst(inst): void{
 	if(!(inst instanceof Task)){
 		throw new Error('Is Not an instanceof Task Class');
@@ -26,17 +24,17 @@ function validateTaskInst(inst): void{
 
 class CircularDependencyError extends Error {
 	dependencyPath: string[];
-	constructor(message: string, dependencyPath: string[]){
-		super(message)
+	constructor(taskName: string, dependencyPath: string[]){
+		super('Circular Dependency: ' + taskName)
 		this.dependencyPath = dependencyPath
 	}
 }
 type RunningOrderRes = {
-	nodes: Node[];
-	list: Node[][];
+	nodes: Node<Task>[];
+	list: Node<Task>[][];
 };
-function createRunningOrder(treeRoot: Node): RunningOrderRes{
-	const nodes: Node[] = [];
+function createRunningOrder(treeRoot: Node<Task>): RunningOrderRes{
+	const nodes: Node<Task>[] = [];
 	treeRoot.traverse(function(node){
 		node.tier = node.distanceFromLeaf();
 		nodes.push(node)
@@ -46,14 +44,14 @@ function createRunningOrder(treeRoot: Node): RunningOrderRes{
 	})
 	const inList = {};
 	let currentTier: number | undefined = undefined;
-	const list: Node[][] = [];
+	const list: Node<Task>[][] = [];
 	nodes.forEach(function(node) {
 		if(node.tier !== currentTier){
 			currentTier = node.tier
 			list.push([])
 		}
 		if(inList[node.name]){
-			node.data.result = 'NOT_TO_BE_RUN'
+			node.data.result = ResultState.NOT_TO_BE_RUN
 			return
 		}
 		inList[node.name] = true;
@@ -76,15 +74,15 @@ interface GlobalOptions {
 interface TaskRegistry {
 	[index: string]: Task;
 }
-type RunOrder = Node[][];
+type RunOrder = Node<Task>[][];
 export default class TaskManager extends EventEmitter {
 	globalOptions: GlobalOptions;
-	taskRegistry: any;
+	taskRegistry: TaskRegistry;
 	runTime?: Date;
 	task?: Task;
 	runId?: string;
-	routeNode?: Node;
-	nodesList: Node[];
+	routeNode?: Node<Task>;
+	nodesList: Node<Task>[];
 	runOrder: RunOrder;
 	_events: any;
 	constructor(globalOptions?: GlobalOptions){
@@ -110,7 +108,7 @@ export default class TaskManager extends EventEmitter {
 		this.runOrder = list;
 		return this;
 	}
-	async runTask(TaskClass: TaskConstructor,options): Promise<any>{
+	async runTask(TaskClass: TaskConstructor,options): Promise<RunResult[]>{
 		await this.runTaskSetUp(TaskClass,options)
 		return this._runTask();
 	}
@@ -120,7 +118,7 @@ export default class TaskManager extends EventEmitter {
 			for(const tier of this.runOrder){
 				// group all tasks that can run at the same tier
 				const res: RunResult[] = await Promise.all(tier.map(async node=>{
-					const result = await node.data._run()
+					const result = await node.data.awaitRun()
 					this.emit('progress',node.data);
 					return result
 				}))
@@ -135,7 +133,7 @@ export default class TaskManager extends EventEmitter {
 			throw error;
 		}
 	}
-	async makeTree({task,parent}: { task: Task; parent?: Task }): Promise<Node>{
+	async makeTree({task,parent}: { task: Task; parent?: Task }): Promise<Node<Task>>{
 		const {name} = task;
 		if(!name){
 			throw new Error('.name is Required')
@@ -145,10 +143,10 @@ export default class TaskManager extends EventEmitter {
 			this.taskRegistry[name] = task
 		}
 		const parentNode = parent ? parent.node : null;
-		const node = new Node(task, parentNode);
+		const node = new Node<Task>(task, parentNode);
 		if(node.isCircular){
 			const dependencyPath = node.path.map(n=>n.name).concat(name)
-			throw new CircularDependencyError('Circular Dependency: ' + name, dependencyPath);
+			throw new CircularDependencyError(name, dependencyPath);
 		}
 		task.node = node;
 		if(parentNode){
@@ -163,26 +161,34 @@ export default class TaskManager extends EventEmitter {
 				return node
 			}
 		}
-		const requires = task._requiredTasks  = await task._requires();
+		let requires: (typeof Task)[] | undefined = undefined;
+		if(oldTask){
+			requires = oldTask._requiredTasks
+		}
+		if(!requires){
+			requires = task._requiredTasks  = await task._requires();
+		}
+		
 
 		for(const TaskClass of requires){
-			const inst = this.instanciateChild(TaskClass as TaskConstructor,task);
+			const inst = this.instanciateChild(TaskClass,task);
 			await this.makeTree({task:inst,parent:task});
 		}
 		return node;
 	} 
 	instanciateChild<P extends MinTask>(TaskClass: TaskConstructor, parentInst: P): Task{
-		const {options,depth=0} = parentInst;
-		const opts: TaskOptions = Object.assign(
-			{taskManager:this,runTime:this.runTime},
-			options,
-			{depth:depth + 1}
-		);
+		const { options, depth=0 } = parentInst;
+		const opts: TaskOptions = {
+			taskManager:this,
+			runTime:this.runTime,
+			...options,
+			depth:depth + 1
+		}
 		const inst = new TaskClass(opts);
 		validateTaskInst(inst)
 		return inst
 	}
-	static runOneTask(TaskClass: TaskConstructor, options: GlobalOptions): any{
+	static runOneTask(TaskClass: TaskConstructor, options: GlobalOptions): Promise<RunResult[]>{
 		const tm = new TaskManager(options);
 		return tm.runTask(TaskClass,options);
 	}

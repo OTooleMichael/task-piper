@@ -3,20 +3,20 @@ import { ResultState } from './types'
 interface MinTaskDesc {
 	name: string;
 }
-export default class Node {
-	data: any;
+export default class Node<T> {
+	data: T;
 	depth: number;
-	path: Node[];
+	path: Node<T>[];
 	id: string;
 	name: string;
 	isCircular: boolean;
 	hasError: boolean;
-	children: Node[];
-	edges: NodeEdge[];
+	children: Node<T>[];
+	edges: NodeEdge<T>[];
 	tier?: number;
 	status?: ResultState;
-	parent?: Node;
-	constructor( data: any, parent?: Node ){
+	parent?: Node<T>;
+	constructor( data: ({ name?: string } & T), parent?: Node<T>){
 		const { name } = data
 		if(!name){
 			throw new Error('name is required');
@@ -39,7 +39,7 @@ export default class Node {
 		this.edges = [];
 		return this;
 	}
-	getParentNextSib(i: number): Node | undefined{
+	getParentNextSib(i: number): Node<T> | undefined{
 		if(!this.parent){
 			return
 		}
@@ -59,21 +59,21 @@ export default class Node {
 		});
 		return max
 	}
-	getSib(i: number): Node | undefined{
+	getSib(i: number): Node<T> | undefined{
 		if(!this.parent){
 			return
 		}
 		const index = this.parent.children.findIndex(child=>child === this);
 		return this.parent.children[index  +  i];
 	}
-	getLastLeafChild(): Node | undefined{
+	getLastLeafChild(): Node<T> | undefined{
 		let child = this.getLastChild()
 		while( child && child.getLastChild() ){
 			child = child.getLastChild()
 		}
 		return child
 	}
-	getLastChild(): Node | undefined{
+	getLastChild(): Node<T> | undefined{
 		const len = this.children.length 
 		return len > 0 ? this.children[len - 1] : undefined;
 	}
@@ -81,7 +81,7 @@ export default class Node {
 		const child = new Node(data,this);
 		return this.addChildNode(child);
 	}
-	addChildNode(child: Node): this{
+	addChildNode(child: Node<T>): this{
 		if(this.children.map(c=>c.name).includes(child.name)){
 			throw new Error('Duplicate Child: '+child.name);
 		}
@@ -97,7 +97,7 @@ export default class Node {
 		this.children.push(child)
 		return this
 	}
-	next(): Node | undefined{
+	next(): Node<T> | undefined{
 		if(this.children.length){
 			return this.children[0];
 		}
@@ -107,13 +107,13 @@ export default class Node {
 		}
 		return this.getParentNextSib(1);
 	}
-	prev(): Node | undefined{
+	prev(): Node<T> | undefined{
 		const sibling = this.getSib(-1);
 		if(!sibling) return this.parent;
 		return sibling.getLastLeafChild() || this.parent;
 	}
-	traverse(fn: (node: Node, i: number) => void ): void{
-		let node: Node | undefined = undefined || this;
+	traverse(fn: (node: Node<T>, i: number) => void ): void{
+		let node: Node<T> | undefined = undefined || this;
 		let i = 0;
 		while(node){
 			fn(node,i);
@@ -122,9 +122,9 @@ export default class Node {
 		}
 	}
 }
-interface NodeEdge {
+interface NodeEdge<T> {
 	parentId: string;
-	parent: Node;
+	parent: Node<T>;
 	childId: string;
-	child: Node;
+	child: Node<T>;
 }

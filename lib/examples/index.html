@@ -1,4 +1,8 @@
 <html>
+<head>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+</head>
 <body>
 <style>
    .net {
@@ -16,8 +20,7 @@
 	<div class="net" id="network0"></div>
 	<div  class="net" id="network1"></div>
 </div>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.min.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+
 <script>
 var bnt = document.getElementById('get-tree');
 let show = true;
@@ -128,7 +131,7 @@ function tierNodes(list){
 	let edges = [];
 	let d = {};
 	let pvt = {};
-	list.forEach(function(node) {
+	list.filter(n=>n.status !== 'NOT_TO_BE_RUN').forEach(function(node) {
 		let {tier,id} = node;
 		t = tier.toString();
 		let n = (tier + 1).toString()
@@ -168,15 +171,22 @@ function tierNodes(list){
 		edges
 	}
 }
+let intervalId = 0;
 function start(){
-	setInterval(function () {
+	axios.get('/reset').then(res=>res)
+	intervalId = setInterval(function () {
 		getData()
 	},1500);
 }
+const COMPLETE_STATUS = ['RUN','NOT_TO_BE_RUN']
 function getData(){
 	axios.get('/data').then(res=>{
 		let { edges,nodes,id } = res.data;
 		window.d = res.data;
+		const complete = !nodes.filter(n=>!COMPLETE_STATUS.includes(n.status)).length
+		if(complete){
+			clearInterval(intervalId)
+		}
 		nodes.sort((a,b)=>a.depth+a.id > b.depth+b.id ? 1 : -1);
 		charts.network0.setData(res.data)
 		let rev = tierNodes(nodes);

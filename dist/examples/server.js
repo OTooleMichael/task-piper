@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,28 +6,31 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // content of index.js
 const http_1 = __importDefault(require("http"));
 const fs_1 = __importDefault(require("fs"));
-const example_1 = require("./example");
+const example_1 = __importDefault(require("./example"));
+const db_1 = __importDefault(require("./db"));
 const port = 3000;
-let tm = null;
 function serveFile(response) {
     fs_1.default.readFile(__dirname + '/index.html', 'UTF-8', function (err, str) {
         response.end(str);
     });
 }
-function start() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            tm = example_1.makeTask();
-            tm.on('progress', function (task) {
-                console.log(task.runId, task.name, task.result);
-            });
-            yield tm.runTask(example_1.RouteExample, {});
-        }
-        catch (error) {
-            console.log(error, 'ERROR OUT');
-            tm = null;
-        }
-    });
+const TASK_NAME = 'RouteExample';
+async function start() {
+    console.log('START');
+    function logProgress(task) {
+        console.log('Progress:', task.runId, task.name, task.result);
+    }
+    try {
+        example_1.default.on('progress', logProgress);
+        const res = await example_1.default.runTask(TASK_NAME);
+        console.log(res);
+    }
+    catch (error) {
+        console.log(error, 'ERROR OUT');
+    }
+    finally {
+        example_1.default.off('progress', logProgress);
+    }
 }
 function getData(tree) {
     const nodes = [tree];
@@ -75,29 +69,40 @@ function getData(tree) {
         edges
     };
 }
-const requestHandler = (request, response) => __awaiter(void 0, void 0, void 0, function* () {
+const requestHandler = async (request, response) => {
     const { url, method } = request;
-    if (!tm) {
-        start();
-    }
     if (method === 'GET' && url == '/') {
         serveFile(response);
         return;
     }
-    if (url == '/data') {
-        try {
-            const data = getData(tm.routeNode);
-            response.end(JSON.stringify(data, null, 2));
-            return;
+    switch (url) {
+        case '/data': {
+            try {
+                const tm = example_1.default.getTaskRun(TASK_NAME);
+                const node = tm ? tm.routeNode : undefined;
+                const data = node ? getData(node) : {};
+                response.end(JSON.stringify(data, null, 2));
+                return;
+            }
+            catch (error) {
+                console.log(error);
+                response.end('{}');
+                return;
+            }
         }
-        catch (error) {
-            console.log(error);
-            response.end('{}');
-            return;
+        case '/reset': {
+            await db_1.default.clear();
+            break;
+        }
+        case '/start': {
+            if (!example_1.default.getRunning(TASK_NAME)) {
+                start();
+            }
+            break;
         }
     }
-    response.end('');
-});
+    response.end('{}');
+};
 const server = http_1.default.createServer(requestHandler);
 server.listen(port, () => {
     console.log(`server is listening on ${port}`);

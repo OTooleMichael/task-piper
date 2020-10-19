@@ -1,26 +1,30 @@
 // content of index.js
 import http from 'http'
 import fs from 'fs'
-import { RouteExample,makeTask } from './example'
+import registry from './example'
 import Node from '../Node';
+import db from './db'
+import { Task } from '../index'
 const port = 3000
-let tm: any = null
 function serveFile(response): void {
 	fs.readFile( __dirname+'/index.html', 'UTF-8',function (err,str) {
 		response.end(str);
 	})
 }
-
+const TASK_NAME = 'RouteExample'
 async function start(): Promise<void>{
+	console.log('START')
+	function logProgress(task: Task): void{
+		console.log('Progress:',task.runId,task.name,task.result)
+	}
 	try{
-		tm = makeTask();
-		tm.on('progress',function(task){
-			console.log(task.runId,task.name,task.result)
-		})
-		await tm.runTask(RouteExample,{});
+		registry.on('progress',logProgress)
+		const res = await registry.runTask(TASK_NAME)
+		console.log(res)
 	}catch(error){
 		console.log(error,'ERROR OUT');
-		tm = null
+	}finally{
+		registry.off('progress',logProgress)
 	}
 }
 interface NodeData {
@@ -32,13 +36,13 @@ interface EdgeData {
 	to: string;
 	from: string;
 }
-function getData(tree: Node): NodeData{
+function getData(tree: Node<Task>): NodeData{
 	const nodes = [tree];
-	let node: Node | undefined = tree;
+	let node: Node<Task> | undefined = tree;
 	let edges: EdgeData[] = [];
 	while(node && node.next()){
 		node = node.next();
-		nodes.push(node as Node)
+		nodes.push(node as Node<Task>)
 	}
 	nodes.sort((a,b)=>a.depth > b.depth ? -1 : 1);
 	const nodesData = nodes.map(function(node){
@@ -71,25 +75,36 @@ function getData(tree: Node): NodeData{
 }
 const requestHandler = async (request, response): Promise<void> => {
 	const {url,method} = request;
-	if(!tm){
-		start();
-	}
 	if(method === 'GET' && url == '/'){
 		serveFile(response)
 		return 
 	}
-	if(url == '/data'){
-		try{
-			const data = getData(tm.routeNode)
-			response.end(JSON.stringify(data,null,2));
-			return
-		}catch(error){
-			console.log(error);
-			response.end('{}')
-			return
+	switch(url){
+		case '/data':{
+			try{
+				const tm = registry.getTaskRun(TASK_NAME)
+				const node = tm ? tm.routeNode : undefined
+				const data = node ? getData(node) : {};
+				response.end(JSON.stringify(data,null,2));
+				return
+			}catch(error){
+				console.log(error);
+				response.end('{}')
+				return
+			}
+		}
+		case '/reset':{
+			await db.clear()
+			break;
+		}
+		case '/start':{
+			if(!registry.getRunning(TASK_NAME)){
+				start();
+			}
+			break;
 		}
 	}
-	response.end('')
+	response.end('{}')
 }
 
 const server = http.createServer(requestHandler)
