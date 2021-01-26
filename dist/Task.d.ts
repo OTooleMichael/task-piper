@@ -1,0 +1,40 @@
+import { TaskOptions, TaskBase, ResultState, LogableEvent, RunResult } from './types';
+export default class Task implements TaskBase {
+    node?: any;
+    name: string;
+    options: any;
+    runId: string;
+    runTime: Date;
+    depth: number;
+    _startedAt?: Date;
+    _isCompletedAt?: Date;
+    ranFor?: number;
+    result?: ResultState;
+    isCompleted: boolean;
+    tier?: number;
+    results?: any;
+    error?: Error;
+    _requiredTasks?: (typeof Task)[];
+    _awaitedRun?: Promise<RunResult>;
+    timeoutMillis: number;
+    constructor(options?: TaskOptions);
+    log(data: LogableEvent): void;
+    isComplete(): boolean | Promise<boolean>;
+    run(task?: Task): any;
+    preRunCheck(): boolean | Promise<boolean>;
+    requires(): IterableIterator<any> | any[];
+    resolveRequirement(value: any): TaskConstructor;
+    _markAsStarted(): void;
+    _markAsComplete(): void;
+    _status(): ResultState;
+    _isComplete(): Promise<boolean>;
+    _requires(): Promise<TaskConstructor[]>;
+    _preRunCheck(): boolean | Promise<boolean>;
+    awaitRun(): Promise<RunResult>;
+    _run(): Promise<RunResult>;
+    static normaliseIterator<T>(toIterate: IterableIterator<T> | T[]): Promise<T[]>;
+    static createTask(params: {
+        name: string;
+    }): typeof Task;
+}
+export declare type TaskConstructor = typeof Task;
