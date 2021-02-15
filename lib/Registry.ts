@@ -173,6 +173,7 @@ export default class Registry extends EventEmitter{
 		}catch(error){
 			this._cleanupRunning(name)
 			this.purgeAwaitables()
+			this.emit('error',error)
 			throw error
 		}
 	}

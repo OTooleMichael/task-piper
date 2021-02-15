@@ -148,6 +148,7 @@ class Task {
         catch (error) {
             this.result = types_1.ResultState.ERROR;
             this.error = error;
+            await this.log({ event: 'error' });
             throw error;
         }
     }

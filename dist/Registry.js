@@ -170,6 +170,7 @@ class Registry extends events_1.EventEmitter {
         catch (error) {
             this._cleanupRunning(name);
             this.purgeAwaitables();
+            this.emit('error', error);
             throw error;
         }
     }

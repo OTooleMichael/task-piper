@@ -153,6 +153,7 @@ export default class Task implements TaskBase {
 		}catch(error){
 			this.result = ResultState.ERROR;
 			this.error = error;
+			await this.log({event:'error'});
 			throw error;
 		}
 	}
