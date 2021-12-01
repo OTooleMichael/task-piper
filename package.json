@@ -1,6 +1,6 @@
 {
   "name": "task-piper",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -50,7 +50,7 @@ function createRunningOrder(treeRoot: Node<Task>): RunningOrderRes{
 			currentTier = node.tier
 			list.push([])
 		}
-		if(inList[node.name]){
+		if(node.duplicateOf){
 			node.data.result = ResultState.NOT_TO_BE_RUN
 			return
 		}
@@ -70,11 +70,14 @@ function createRunningOrder(treeRoot: Node<Task>): RunningOrderRes{
 }
 interface GlobalOptions {
 	fullDepth?: number;
+	skipCompleteCheck?: boolean;
 }
 interface TaskRegistry {
 	[index: string]: Task;
 }
 type RunOrder = Node<Task>[][];
+
+type TierResult = ['fulfilled', Task, RunResult] | ['rejected', Task, Error]
 export default class TaskManager extends EventEmitter {
 	globalOptions: GlobalOptions;
 	taskRegistry: TaskRegistry;
@@ -93,47 +96,56 @@ export default class TaskManager extends EventEmitter {
 		this.runOrder = []
 		return this
 	}
-	async runTaskSetUp(TaskClass: TaskConstructor,options): Promise<TaskManager>{
+	async runTaskSetUp(TaskClass: TaskConstructor, options): Promise<TaskManager>{
 		this.runTime = new Date();
 		const minTaskOptions: MinTask = {options,depth:0}
-		const task: Task = this.task = this.instanciateChild(TaskClass,minTaskOptions)
+		const task: Task = this.task = this.instanciateChild(TaskClass, minTaskOptions)
 		if(!task){
 			throw new Error('.task not found')
 		}
 		this.runId = task.runId;
 		const routeNode = await this.makeTree({ task, parent:undefined });
 		this.routeNode = routeNode
-		const {nodes,list} = createRunningOrder(routeNode);
+		const { nodes, list } = createRunningOrder(routeNode);
 		this.nodesList = nodes;
 		this.runOrder = list;
 		return this;
 	}
-	async runTask(TaskClass: TaskConstructor,options): Promise<RunResult[]>{
-		await this.runTaskSetUp(TaskClass,options)
+	async runTask(TaskClass: TaskConstructor, options): Promise<RunResult[]>{
+		await this.runTaskSetUp(TaskClass, options)
 		return this._runTask();
 	}
 	async _runTask(): Promise<RunResult[]>{
-		try{
-			let results: RunResult[] = [];
-			for(const tier of this.runOrder){
-				// group all tasks that can run at the same tier
-				const res: RunResult[] = await Promise.all(tier.map(async node=>{
-					const result = await node.data.awaitRun()
-					this.emit('progress',node.data);
-					return result
-				}))
-				results = results.concat(res);
+		let results: RunResult[] = [];
+		for(const tier of this.runOrder){
+			// group all tasks that can run at the same tier
+			const res = await Promise.all(tier.map(async (node): Promise<TierResult>=>{
+				try{
+					const promise = node.data.awaitRun()
+					this.emit('progress', node.data);
+					const result = await promise
+					this.emit('progress', node.data);
+					return ['fulfilled', node.data, result]
+				}catch(error){
+					this.emit('progress', node.data)
+					return ['rejected', node.data, error as Error]
+				}
+			}))
+			results = results.concat(res.filter(res=>res[0] === 'fulfilled').map((res)=>res[2] as RunResult));
+			const errors = res.filter(res=>res[0] === 'rejected') as ['rejected', Task, Error][] 
+			if(errors.length){
+				if(this._events.error){
+					errors.forEach((res)=>{
+						this.emit('error', res[2]);
+					})
+				}
+				throw errors[0][2];
 			}
-			this.emit('complete',results);
-			return results;
-		}catch(error){
-			if(this._events.error){
-				this.emit('error',error);
-			}
-			throw error;
 		}
+		this.emit('complete', results);
+		return results;
 	}
-	async makeTree({task,parent}: { task: Task; parent?: Task }): Promise<Node<Task>>{
+	async makeTree({task, parent}: { task: Task; parent?: Task }): Promise<Node<Task>>{
 		const {name} = task;
 		if(!name){
 			throw new Error('.name is Required')
@@ -152,7 +164,7 @@ export default class TaskManager extends EventEmitter {
 		if(parentNode){
 			parentNode.addChildNode(node);
 		}
-		const isComplete = oldTask ? oldTask.isCompleted : await task._isComplete();
+		const isComplete = this.globalOptions?.skipCompleteCheck ? false : (oldTask ? oldTask.isCompleted : await task._isComplete());
 		node.status = ResultState.PENDING
 		if(isComplete){
 			node.status = ResultState.IS_ALREADY_COMPLETE
@@ -162,17 +174,18 @@ export default class TaskManager extends EventEmitter {
 			}
 		}
 		let requires: (typeof Task)[] | undefined = undefined;
+
 		if(oldTask){
 			requires = oldTask._requiredTasks
 		}
+
 		if(!requires){
 			requires = task._requiredTasks  = await task._requires();
 		}
-		
 
 		for(const TaskClass of requires){
 			const inst = this.instanciateChild(TaskClass,task);
-			await this.makeTree({task:inst,parent:task});
+			await this.makeTree({task:inst, parent:task});
 		}
 		return node;
 	} 
@@ -193,3 +206,4 @@ export default class TaskManager extends EventEmitter {
 		return tm.runTask(TaskClass,options);
 	}
 }
+

@@ -37,14 +37,13 @@ export default class SharedWaiting {
 		try{
 			const res = await this._run(...args)
 			this._resolve(res)
-			return res;
 		}catch(e){
-			this._reject(e) 
-			throw e
+			this._reject(e)
 		}finally{
 			this.active = false
 			this.routes = this.routes.filter(r=>r !== route)
 		}
+		return this.awaitable as Promise<any>
 	}
 	getRun(route: string): AnyAsyncFn{
 		if(typeof route !== 'string'){
@@ -54,6 +53,6 @@ export default class SharedWaiting {
 		// 	throw new Error('Route already exists: '+route)
 		// }
 		this.routes.push(route)
-		return this.run.bind(this,route)
+		return this.run.bind(this, route)
 	}
 }

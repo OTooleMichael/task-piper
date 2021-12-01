@@ -43,10 +43,21 @@ const EChild3Data = {
 	}
 }
 const EChild3 = ProjectTask.createTask(EChild3Data);
+const EChild3Error = ProjectTask.createTask({
+	name:'EChildError',
+	requires:function requires(): TaskConstructor[]{
+		return [ EChild ]
+	},
+	async run(): Promise<void>{
+		throw new Error('EChild Error')
+		await wait(1500);
+	}
+});
 class EChild4 extends ProjectTask {
 	name = 'EChild4'
 	requires(): TaskConstructor[] {
 		return [
+			EChild3Error,
 			EChild3
 		]
 	}
@@ -98,7 +109,7 @@ class RouteExample extends ProjectTask {
 // 	const res = await EChild3.run({});
 // 	console.log(res);
 // }
-class MyRegistry extends Registry{
+class MyRegistry extends Registry {
 	add(TaskClass: typeof ProjectTask): this{
 		TaskClass.registry = this
 		super.add(TaskClass)

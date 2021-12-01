@@ -174,18 +174,22 @@ function tierNodes(list){
 let intervalId = 0;
 function start(){
 	axios.get('/reset').then(res=>res)
+	clearInterval(intervalId)
 	intervalId = setInterval(function () {
 		getData()
 	},1500);
 }
-const COMPLETE_STATUS = ['RUN','NOT_TO_BE_RUN']
+const COMPLETE_STATUS = ['RUN','NOT_TO_BE_RUN','ERROR']
 function getData(){
 	axios.get('/data').then(res=>{
 		let { edges,nodes,id } = res.data;
 		window.d = res.data;
+		console.log(nodes)
 		const complete = !nodes.filter(n=>!COMPLETE_STATUS.includes(n.status)).length
-		if(complete){
-			clearInterval(intervalId)
+		if(complete || nodes.find(n=>n.status === 'ERROR')){
+			setTimeout(function(){
+				clearInterval(intervalId)
+			}, 1000*15)
 		}
 		nodes.sort((a,b)=>a.depth+a.id > b.depth+b.id ? 1 : -1);
 		charts.network0.setData(res.data)

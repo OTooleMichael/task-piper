@@ -1,8 +1,10 @@
+import { ResultState } from '.'
 import Registry from './Registry'
 import Task from './Task'
 const wait = (t=500):Promise<void>=>new Promise(resolve=>setTimeout(resolve,t))
 function removeTimeVars(r){
 	delete r.ranFor
+	delete r.depth
 	return r
 }
 describe('Registry',function () {
@@ -143,6 +145,26 @@ describe('Registry',function () {
 		// only each unique task has a trueCalled
 		expect(logs.filter(({event})=>event === 'trueCalled').length).toEqual(4)
 	})
+	it('Runs two dependency Trees with shared resources',async function(){
+		const progress: [string, ResultState][] = []
+		const registry = new Registry()
+		registry.on('progress', (task: Task)=>progress.push([task.name, task._status()]))
+		registry.add(SampleTask)
+		registry.add(SampleTask2)
+		registry.add(SampleParent)
+		registry.add(SampleParent2)
+		await Promise.all([
+			registry.runTask('SampleParent'),
+			registry.runTask('SampleParent2'),
+		])
+		// all tasks have a start & complete
+		expect(logs.filter(({event})=>event !== 'trueCalled')).toHaveLength(14)
+		expect(progress.length).toBe(14)
+		expect(progress.filter(t=>t[1] === ResultState.RUNNING)).toHaveLength(7)
+		expect(progress.filter(t=>t[1] === ResultState.RUN)).toHaveLength(7)
+		// only each unique task has a trueCalled
+		expect(logs.filter(({event})=>event === 'trueCalled').length).toEqual(4)
+	})
 	it('Can be used during resolution',async function (){
 		registry.add(SampleTask)
 		registry.add(SampleTask2)
@@ -153,7 +175,7 @@ describe('Registry',function () {
 			isComplete:()=>false,
 			requires(){
 				return [
-					'SampleTask','SampleTask2',SampleParent
+					'SampleTask', 'SampleTask2', SampleParent
 				]
 			},
 			resolveRequirement:function(name: string | typeof Task): (typeof Task){

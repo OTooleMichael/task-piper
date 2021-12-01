@@ -35,7 +35,7 @@ type CreateFromObjectPayload = {
 	[x: string]: any;
 }
 
-export default class Registry extends EventEmitter{
+export default class Registry extends EventEmitter {
 	tasks: Dict<typeof Task> = {};
 	awaitableNodes: Dict<SharedWaiting> = {};
 	runningTasks: Dict<TaskManager> = {};
@@ -47,7 +47,7 @@ export default class Registry extends EventEmitter{
 		this.awaitableNodes = {}
 		this.runningTasks = {}
 	}
-	purgeAwaitables(): void{
+	purgeAwaitables(): void {
 		for(const key in this.awaitableNodes){
 			const awaitable = this.awaitableNodes[key]
 			if(!awaitable.active){
@@ -100,7 +100,7 @@ export default class Registry extends EventEmitter{
 		delete this.runningTasks[name]
 		setTimeout(()=>{
 			delete this.recentlyFinished[name]
-		},this.cleanupTimeout)
+		}, this.cleanupTimeout)
 		return this
 	}
 	async runTask(nameOrClass: typeof Task | string, options={}): Promise<RunResult[]>{
@@ -142,7 +142,7 @@ export default class Registry extends EventEmitter{
 		let tm = new TaskManager(options);
 		try{
 			this.runningTasks[name] = tm;
-			tm = await tm.runTaskSetUp(TaskClass,options)
+			tm = await tm.runTaskSetUp(TaskClass, options)
 			const nodes = tm.nodesList.filter(function(node: Node<Task>){
 				// tasks that appear multiple times in complex tree 
 				// only need to be patched if they might be run
@@ -162,8 +162,10 @@ export default class Registry extends EventEmitter{
 					return overideFn(task)
 				}
 			}
-			tm.on('progress',(data: Task)=>{
-				this.emit('progress',data)
+			tm.on('complete', (data: RunResult[])=>{
+				this.emit('compelete', data)
+			}).on('progress', (data: Task)=>{
+				this.emit('progress', data)
 				const awaitable = this.awaitableNodes[Task.name]
 				if(awaitable && !awaitable.active){
 					delete this.awaitableNodes[Task.name]
@@ -173,7 +175,10 @@ export default class Registry extends EventEmitter{
 		}catch(error){
 			this._cleanupRunning(name)
 			this.purgeAwaitables()
-			this.emit('error',error)
+			// @ts-ignore
+			if(this._events.error){
+				this.emit('error', error)
+			}
 			throw error
 		}
 	}

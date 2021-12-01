@@ -16,6 +16,8 @@ export default class Node<T> {
 	tier?: number;
 	status?: ResultState;
 	parent?: Node<T>;
+	_nodeSet: Record<string, Node<T>>
+	duplicateOf?: string
 	constructor( data: ({ name?: string } & T), parent?: Node<T>){
 		const { name } = data
 		if(!name){
@@ -37,6 +39,8 @@ export default class Node<T> {
 		this.hasError = this.isCircular;
 		this.children = [];
 		this.edges = [];
+		this._nodeSet = {}
+		this.duplicateOf = undefined
 		return this;
 	}
 	getParentNextSib(i: number): Node<T> | undefined{
@@ -78,7 +82,7 @@ export default class Node<T> {
 		return len > 0 ? this.children[len - 1] : undefined;
 	}
 	addChild(data): this{
-		const child = new Node(data,this);
+		const child = new Node(data, this);
 		return this.addChildNode(child);
 	}
 	addChildNode(child: Node<T>): this{
@@ -86,7 +90,13 @@ export default class Node<T> {
 			throw new Error('Duplicate Child: '+child.name);
 		}
 		if(child.parent !== this){
-			throw new Error('Cant add Child to other Patrent: '+child.name);
+			throw new Error('Cant add Child to other Parent: ' + child.name);
+		}
+		const duplicateOf = this.root()._nodeSet[child.name]?.id
+		if(duplicateOf){
+			child.duplicateOf = duplicateOf
+		}else{
+			this.root()._nodeSet[child.name] = child
 		}
 		this.edges.push({
 			parentId:this.id,
@@ -96,6 +106,9 @@ export default class Node<T> {
 		})
 		this.children.push(child)
 		return this
+	}
+	root(): Node<T>{
+		return this.parent?.root() || this
 	}
 	next(): Node<T> | undefined{
 		if(this.children.length){

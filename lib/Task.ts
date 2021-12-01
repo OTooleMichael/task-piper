@@ -73,7 +73,7 @@ export default class Task implements TaskBase {
 		return value as TaskConstructor
 	}
 	_markAsStarted(): void{
-		this._startedAt = new Date();
+		this._startedAt = this._startedAt || new Date();
 		this.log({event:'started'})
 	}
 	_markAsComplete(): void {
@@ -116,6 +116,7 @@ export default class Task implements TaskBase {
 	}
 	awaitRun(): Promise<RunResult>{
 		if(!this._awaitedRun){
+			this._startedAt = this._startedAt || new Date();
 			this._awaitedRun = this._run()
 		}
 		return this._awaitedRun
@@ -152,7 +153,7 @@ export default class Task implements TaskBase {
 			return out
 		}catch(error){
 			this.result = ResultState.ERROR;
-			this.error = error;
+			this.error = error as Error;
 			await this.log({event:'error'});
 			throw error;
 		}
@@ -166,7 +167,7 @@ export default class Task implements TaskBase {
 		}
 		return (toIterate as T[])
 	}
-	public static createTask(params: { name: string }): typeof Task{
+	public static createTask(params: { name: string; [key: string]: any }): typeof Task{
 		const { name, ...restParams } = params;
 		if(!name) throw new Error('name is a required field');
 		const SuperMostTaskClass = this || Task;
